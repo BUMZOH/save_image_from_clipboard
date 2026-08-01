@@ -1,33 +1,86 @@
-from pathlib import Path
+from argparse import ArgumentParser
 from datetime import datetime
-from PIL import ImageGrab
+from pathlib import Path
 import subprocess
 
-def save_clipboard_image_to_pictures():
-    # ピクチャフォルダのパスを取得
+from PIL import ImageGrab, Image
+
+def create_parser() -> ArgumentParser:
+    """コマンドライン引数を解析するArgumentParserを作成する。"""
+    parser = ArgumentParser(
+        description=(
+            "クリップボード画像をピクチャフォルダへ保存し、"
+            "必要に応じてフォルダを開きます。"
+        ),
+    )
+
+    option_group = parser.add_mutually_exclusive_group()
+
+    option_group.add_argument(
+        "-o",
+        "--open-only",
+        action="store_true",
+        help="画像を保存せず、ピクチャフォルダを開くだけにします。",
+    )
+    option_group.add_argument(
+        "-n",
+        "--no-new-folder",
+        action="store_true",
+        help="処理後にピクチャフォルダを開きません。",
+    )
+
+    return parser
+
+
+def get_pictures_path() -> Path:
+    """ピクチャフォルダのパスを取得し、存在しなければ作成する。"""
     pictures_path = Path.home() / "Pictures"
-
-    # フォルダが存在しない場合は作成
     pictures_path.mkdir(parents=True, exist_ok=True)
+    return pictures_path
 
-    # クリップボードから画像を取得
-    img = ImageGrab.grabclipboard()
 
-    if img is None:
+def open_folder(folder_path: Path) -> None:
+    """指定したフォルダをWindowsエクスプローラーで開く。"""
+    subprocess.run(
+        ["explorer", str(folder_path)],
+        check=False,
+    )
+
+
+def save_clipboard_image(pictures_path: Path) -> bool:
+    """クリップボード画像をPNG形式で保存する。"""
+    clipboard_data = ImageGrab.grabclipboard()
+
+    if not isinstance(clipboard_data, Image.Image):
         print("クリップボードに画像がありません。")
-        input("何かキーを押してください")
-        return
+        return False
 
-    # 日時付きのファイル名を生成
-    filename = f"clipboard_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+    filename = f"clipboard_{datetime.now():%Y%m%d_%H%M%S}.png"
     save_path = pictures_path / filename
 
-    # 画像を保存
-    img.save(save_path, "PNG")
+    clipboard_data.save(save_path, "PNG")
     print(f"画像を保存しました: {save_path}")
+    return True
 
-    # 保存後にピクチャフォルダをエクスプローラーで開く
-    subprocess.run(["explorer", str(pictures_path)])
+
+def main() -> None:
+    """コマンドライン引数に応じて処理を実行する。"""
+    parser = create_parser()
+    args = parser.parse_args()
+
+    pictures_path = get_pictures_path()
+
+    # -o: 画像を保存せず、フォルダを開くだけ
+    if args.open_only:
+        open_folder(pictures_path)
+        return
+
+    image_saved = save_clipboard_image(pictures_path)
+
+    # 保存に成功し、-nが指定されていない場合だけフォルダを開く
+    if image_saved and not args.no_new_folder:
+        open_folder(pictures_path)
+
 
 if __name__ == "__main__":
-    save_clipboard_image_to_pictures()
+    main()
