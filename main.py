@@ -5,9 +5,24 @@ import subprocess
 
 from PIL import ImageGrab, Image
 
+class PauseArgumentParser(ArgumentParser):
+    """終了前にEnterキーの入力を待つArgumentParser。"""
+
+    def exit(
+        self,
+        status: int = 0,
+        message: str | None = None,
+    ) -> None:
+        if message:
+            self._print_message(message)
+
+        input("\nEnterキーを押すと終了します。")
+        raise SystemExit(status)
+
+
 def create_parser() -> ArgumentParser:
     """コマンドライン引数を解析するArgumentParserを作成する。"""
-    parser = ArgumentParser(
+    parser = PauseArgumentParser(
         description=(
             "クリップボード画像をピクチャフォルダへ保存し、"
             "必要に応じてフォルダを開きます。"
@@ -53,6 +68,7 @@ def save_clipboard_image(pictures_path: Path) -> bool:
 
     if not isinstance(clipboard_data, Image.Image):
         print("クリップボードに画像がありません。")
+        input("\nEnterキーを押すと終了します。")
         return False
 
     filename = f"clipboard_{datetime.now():%Y%m%d_%H%M%S}.png"
